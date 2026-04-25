@@ -34,7 +34,8 @@ data class CheckupUiState(
     val isRecording: Boolean = false,
     val summaryReady: Boolean = false,
     val summaryText: String = "",
-    val nextSteps: List<String> = emptyList()
+    val nextSteps: List<String> = emptyList(),
+    val gemmaReady: Boolean = false
 )
 
 class CheckupViewModel(
@@ -64,27 +65,32 @@ class CheckupViewModel(
 
     private fun initializeModels() {
         viewModelScope.launch(Dispatchers.IO) {
+            // Load Whisper eagerly — needed for live transcription
             try {
-                _uiState.update { it.copy(loadingMessage = "Loading Whisper (speech recognition)...") }
+                _uiState.update { it.copy(loadingMessage = "Loading Whisper...") }
                 whisperManager.initialize { progress ->
                     _uiState.update { it.copy(loadingMessage = "Whisper: ${(progress * 100).toInt()}%") }
                 }
-
-                _uiState.update { it.copy(loadingMessage = "Loading Gemma (language model)...") }
-                gemmaManager.initialize { progress ->
-                    _uiState.update { it.copy(loadingMessage = "Gemma: ${(progress * 100).toInt()}%") }
-                }
-
-                _uiState.update { it.copy(loadingMessage = "Connecting to doctor...") }
-                connectToHeygen()
-
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        loadingMessage = "Error: ${e.message}"
-                    )
-                }
+                // Whisper failure is non-fatal; transcription just won't work
+            }
+
+            // Connect to HeyGen immediately — don't wait for Gemma
+            _uiState.update { it.copy(loadingMessage = "Connecting to doctor...") }
+            connectToHeygen()
+
+            // Load Gemma in background after UI is shown — it's only needed for summarization
+            loadGemmaInBackground()
+        }
+    }
+
+    private fun loadGemmaInBackground() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                gemmaManager.initialize { /* silent background load */ }
+                _uiState.update { it.copy(gemmaReady = true) }
+            } catch (e: Exception) {
+                // Gemma unavailable — summarization falls back to backend API only
             }
         }
     }
@@ -118,7 +124,6 @@ class CheckupViewModel(
                 _uiState.update { it.copy(isLoading = false) }
             }
         } catch (e: Exception) {
-            // Still proceed without HeyGen if backend unreachable
             _uiState.update { it.copy(isLoading = false) }
         }
     }
@@ -134,20 +139,13 @@ class CheckupViewModel(
     fun toggleWhisper() {
         val newState = !_uiState.value.isWhisperEnabled
         _uiState.update { it.copy(isWhisperEnabled = newState) }
-
-        if (newState) {
-            startRecordingLoop()
-        } else {
-            stopRecordingLoop()
-        }
+        if (newState) startRecordingLoop() else stopRecordingLoop()
     }
 
     private fun startRecordingLoop() {
         recordingJob = viewModelScope.launch {
             while (_uiState.value.isWhisperEnabled) {
-                if (!_uiState.value.isMuted) {
-                    recordAndTranscribe()
-                }
+                if (!_uiState.value.isMuted) recordAndTranscribe()
                 delay(500)
             }
         }
@@ -163,21 +161,16 @@ class CheckupViewModel(
     private suspend fun recordAndTranscribe() {
         _uiState.update { it.copy(isRecording = true) }
         audioRecorder.startRecording()
-        delay(5000) // Record 5-second chunks
+        delay(5000)
         val audioData = audioRecorder.stopAndGetAudio()
         _uiState.update { it.copy(isRecording = false) }
 
         if (audioData.isEmpty()) return
 
-        val rawText = whisperManager.transcribe(audioData)
-        if (rawText.isBlank()) return
+        val text = whisperManager.transcribe(audioData)
+        if (text.isBlank()) return
 
-        // Use Gemma to clean up the transcription
-        val context = buildPatientContext()
-        val cleanedText = gemmaManager.processAudioText(rawText, context)
-        val finalText = cleanedText.ifBlank { rawText }
-
-        addTranscriptEntry("Patient", finalText)
+        addTranscriptEntry("Patient", text)
     }
 
     fun requestSummary() {
@@ -187,8 +180,8 @@ class CheckupViewModel(
             val transcriptText = _transcript.value.joinToString("\n") { "${it.speaker}: ${it.text}" }
             val currentTime = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
 
+            // Always try backend first
             try {
-                // First try the backend
                 val response = ApiClient.service.summarizeTranscript(
                     TranscriptSummaryRequest(
                         transcript = transcriptText,
@@ -200,7 +193,6 @@ class CheckupViewModel(
                         userName = patientName
                     )
                 )
-
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
                     _uiState.update {
@@ -211,12 +203,22 @@ class CheckupViewModel(
                             nextSteps = body.nextSteps
                         )
                     }
-                } else {
-                    // Fall back to local Gemma
-                    generateLocalSummary(transcriptText)
+                    return@launch
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {}
+
+            // Fallback: local Gemma if it loaded, otherwise show raw transcript
+            if (_uiState.value.gemmaReady) {
                 generateLocalSummary(transcriptText)
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        summaryReady = true,
+                        summaryText = "Backend unavailable and Gemma is still loading. Transcript saved.",
+                        nextSteps = emptyList()
+                    )
+                }
             }
         }
     }
@@ -240,13 +242,8 @@ class CheckupViewModel(
     }
 
     private fun addTranscriptEntry(speaker: String, text: String) {
-        _transcript.update { current ->
-            current + TranscriptEntry(speaker = speaker, text = text)
-        }
+        _transcript.update { current -> current + TranscriptEntry(speaker = speaker, text = text) }
     }
-
-    private fun buildPatientContext(): String =
-        "Patient name: $patientName. Doctor: $doctorName. Checkup session."
 
     override fun onCleared() {
         super.onCleared()
