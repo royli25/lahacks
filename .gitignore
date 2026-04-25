@@ -1,0 +1,15 @@
+.DS_Store
+*.DS_Store
+__pycache__/
+*.pyc
+.env
+node_modules/
+ReactTS/node_modules/
+*.local
+.idea/
+*.iml
+.gradle/
+Kotlin/local.properties
+Kotlin/app/build/
+Kotlin/.gradle/
+Kotlin/build/

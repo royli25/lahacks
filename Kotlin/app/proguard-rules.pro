@@ -1,0 +1,6 @@
+-keep class com.zeticai.** { *; }
+-keep class com.amiya.health.data.models.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
