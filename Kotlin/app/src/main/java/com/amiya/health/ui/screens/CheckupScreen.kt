@@ -1,5 +1,9 @@
 package com.amiya.health.ui.screens
 
+import android.webkit.PermissionRequest
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -58,6 +62,14 @@ fun CheckupScreen(
     val uiState by viewModel.uiState.collectAsState()
     val transcript by viewModel.transcript.collectAsState()
     val listState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearError()
+        }
+    }
 
     LaunchedEffect(transcript.size) {
         if (transcript.isNotEmpty()) {
@@ -78,10 +90,15 @@ fun CheckupScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
-        // HeyGen WebView avatar fills the screen
-        HeyGenWebView(
-            sessionToken = uiState.heygenToken,
-            sessionData = uiState.heygenSession,
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 80.dp)
+        )
+
+        // LiveAvatar video stream via LiveKit
+        LiveAvatarWebView(
+            livekitUrl = uiState.livekitUrl,
+            livekitClientToken = uiState.livekitClientToken,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -349,17 +366,31 @@ private fun PermissionsNeededScreen(onRequest: () -> Unit) {
 }
 
 @Composable
-private fun HeyGenWebView(
-    sessionToken: String?,
-    sessionData: String?,
+private fun LiveAvatarWebView(
+    livekitUrl: String?,
+    livekitClientToken: String?,
     modifier: Modifier = Modifier
 ) {
-    if (sessionToken == null) {
+    if (livekitUrl == null || livekitClientToken == null) {
         Box(modifier = modifier.background(Color(0xFF1A1A2E)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator(color = AmiyaPurple)
                 Spacer(Modifier.height(12.dp))
                 Text("Connecting to doctor...", color = Color.White)
+            }
+        }
+        return
+    }
+
+    var loadError by remember { mutableStateOf<String?>(null) }
+    val url = "https://meet.livekit.io/custom?liveKitUrl=${livekitUrl}&token=${livekitClientToken}"
+
+    if (loadError != null) {
+        Box(modifier = modifier.background(Color(0xFF1A1A2E)), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Video unavailable", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                Text(loadError ?: "", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall)
             }
         }
         return
@@ -377,67 +408,20 @@ private fun HeyGenWebView(
                     allowFileAccess = true
                     cacheMode = WebSettings.LOAD_NO_CACHE
                 }
-                webViewClient = WebViewClient()
-                // Load the HeyGen streaming avatar HTML
-                loadDataWithBaseURL(
-                    "https://api.heygen.com",
-                    buildHeyGenHtml(sessionToken, sessionData ?: ""),
-                    "text/html",
-                    "UTF-8",
-                    null
-                )
+                webViewClient = object : WebViewClient() {
+                    override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                        if (request.isForMainFrame) {
+                            loadError = error.description?.toString() ?: "Unknown error"
+                        }
+                    }
+                }
+                webChromeClient = object : WebChromeClient() {
+                    override fun onPermissionRequest(request: PermissionRequest) {
+                        request.grant(request.resources)
+                    }
+                }
+                loadUrl(url)
             }
-        },
-        update = { webView ->
-            // Re-load if token changes
         }
     )
 }
-
-private fun buildHeyGenHtml(token: String, sessionJson: String): String = """
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0D1117; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-    video { width: 100%; height: 100%; object-fit: cover; }
-    #status { position: absolute; top: 10px; left: 10px; color: white; font-family: sans-serif; font-size: 12px; background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 4px; }
-  </style>
-</head>
-<body>
-  <video id="avatarVideo" autoplay playsinline></video>
-  <div id="status">Initializing...</div>
-  <script>
-    const TOKEN = "${token}";
-    const STATUS = document.getElementById('status');
-
-    async function initAvatar() {
-      try {
-        STATUS.textContent = 'Loading HeyGen SDK...';
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/@heygen/streaming-avatar@latest/dist/index.umd.js';
-        script.onload = async () => {
-          STATUS.textContent = 'Connecting...';
-          const avatar = new HeyGenStreamingAvatar({ token: TOKEN });
-          const session = await avatar.createStartAvatar({
-            quality: 'medium',
-            avatarName: 'default',
-            voice: { rate: 1.0, emotion: 'Friendly' }
-          });
-          const videoEl = document.getElementById('avatarVideo');
-          if (session.stream) videoEl.srcObject = session.stream;
-          STATUS.textContent = 'Connected';
-          window._avatar = avatar;
-        };
-        document.head.appendChild(script);
-      } catch(e) {
-        STATUS.textContent = 'Error: ' + e.message;
-      }
-    }
-    initAvatar();
-  </script>
-</body>
-</html>
-""".trimIndent()

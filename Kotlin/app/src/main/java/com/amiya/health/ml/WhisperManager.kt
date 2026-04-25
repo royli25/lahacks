@@ -1,6 +1,8 @@
 package com.amiya.health.ml
 
 import android.content.Context
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.zeticai.mlange.core.model.ZeticMLangeModel
 import com.zeticai.mlange.core.model.ModelMode
 import com.zeticai.mlange.core.tensor.Tensor
@@ -17,6 +19,7 @@ class WhisperManager(private val context: Context) {
 
     private var encoderModel: ZeticMLangeModel? = null
     private var decoderModel: ZeticMLangeModel? = null
+    private var vocab: List<String> = emptyList()
 
     private val ZETIC_API_KEY = "dev_66cf3a5ebcfb48179b4c61b89f96d6ce"
     private val SAMPLE_RATE = 16000
@@ -34,8 +37,19 @@ class WhisperManager(private val context: Context) {
     private val EOT_TOKEN = 50256
     private val MAX_NEW_TOKENS = 224
 
+    private fun loadVocab() {
+        try {
+            val json = context.assets.open("whisper_vocab.json").bufferedReader().readText()
+            val type = object : TypeToken<List<String>>() {}.type
+            vocab = Gson().fromJson(json, type)
+        } catch (e: Exception) {
+            vocab = emptyList()
+        }
+    }
+
     suspend fun initialize(onProgress: (Float) -> Unit = {}) {
         withContext(Dispatchers.IO) {
+            loadVocab()
             encoderModel = ZeticMLangeModel(
                 context,
                 ZETIC_API_KEY,
@@ -216,9 +230,7 @@ class WhisperManager(private val context: Context) {
     }
 
     private fun whisperTokenToText(token: Int): String {
-        // Full tokenizer requires loading vocab.json from assets;
-        // returning empty here keeps the pipeline compilable.
-        return ""
+        return if (token >= 0 && token < vocab.size) vocab[token] else ""
     }
 
     fun release() {

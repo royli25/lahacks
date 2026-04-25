@@ -2,7 +2,7 @@ package com.amiya.health.data.models
 
 import com.google.gson.annotations.SerializedName
 
-// ── Doctor ──────────────────────────────────────────────────────────────────
+// ── Doctor ───────────────────────────────────────────────────────────────────
 
 data class DoctorProfile(
     val id: String,
@@ -13,8 +13,8 @@ data class DoctorProfile(
 )
 
 val DOCTOR_PROFILES = listOf(
-    DoctorProfile("alpha", "Dr. Carol Lee", "alpha_avatar", "Dr. Carol Lee", "Internal Medicine"),
-    DoctorProfile("beta", "Dr. Dexter Sins", "beta_avatar", "Dr. Dexter Sins", "Family Medicine"),
+    DoctorProfile("alpha", "Dr. Carol Lee",     "alpha_avatar", "Dr. Carol Lee",     "Internal Medicine"),
+    DoctorProfile("beta",  "Dr. Dexter Sins",   "beta_avatar",  "Dr. Dexter Sins",   "Family Medicine"),
     DoctorProfile("gamma", "Dr. Karen Roberts", "gamma_avatar", "Dr. Karen Roberts", "Geriatrics"),
 )
 
@@ -44,60 +44,45 @@ data class PatientLookupResponse(
 data class StartRequest(
     @SerializedName("profile_id") val profileId: String,
     @SerializedName("user_name") val userName: String,
-    val language: String = "en",
-    @SerializedName("deterministic_greeting") val deterministicGreeting: Boolean = false
+    @SerializedName("deterministic_greeting") val deterministicGreeting: Boolean = true
 )
 
 data class SessionResponse(
-    val token: String,
-    val session: SessionPayload,
-    val greeting: String,
-    @SerializedName("effective_knowledge") val effectiveKnowledge: String = ""
+    @SerializedName("session_id") val sessionId: String,
+    @SerializedName("livekit_url") val livekitUrl: String,
+    @SerializedName("livekit_client_token") val livekitClientToken: String,
+    @SerializedName("ws_url") val wsUrl: String,
+    val greeting: String = ""
 )
 
-data class SessionPayload(
-    val avatarName: String,
-    val language: String,
-    val quality: String = "medium"
+// ── Speak ────────────────────────────────────────────────────────────────────
+
+data class SpeakRequest(
+    @SerializedName("session_id") val sessionId: String,
+    val text: String
 )
 
-// ── Transcript ────────────────────────────────────────────────────────────────
-
-data class TranscriptEntry(
-    val speaker: String,  // "Doctor" or "Patient"
-    val text: String,
-    val timestamp: Long = System.currentTimeMillis()
+data class SpeakResponse(
+    val ok: Boolean
 )
 
-data class TranscriptSummaryRequest(
+// ── Summary ──────────────────────────────────────────────────────────────────
+
+data class SaveSummaryRequest(
     val transcript: String,
-    @SerializedName("start_time") val startTime: String,
-    @SerializedName("current_time") val currentTime: String,
-    @SerializedName("phone_number") val phoneNumber: String,
+    val summary: String,
     val uid: String,
     @SerializedName("doctor_name") val doctorName: String,
     @SerializedName("user_name") val userName: String
 )
 
-data class SummaryResponse(
-    val summary: String,
-    @SerializedName("next_steps") val nextSteps: List<String> = emptyList()
+// ── Transcript ────────────────────────────────────────────────────────────────
+
+data class TranscriptEntry(
+    val speaker: String,
+    val text: String,
+    val timestamp: Long = System.currentTimeMillis()
 )
-
-// ── Audio Processing ──────────────────────────────────────────────────────────
-
-data class AudioProcessRequest(
-    @SerializedName("audio_data") val audioData: String,  // base64
-    @SerializedName("patient_context") val patientContext: String = ""
-)
-
-data class AudioProcessResponse(
-    @SerializedName("transcribed_text") val transcribedText: String,
-    @SerializedName("processed_text") val processedText: String,
-    val success: Boolean
-)
-
-// ── Checkup History ───────────────────────────────────────────────────────────
 
 data class CheckupRecord(
     val id: String,
