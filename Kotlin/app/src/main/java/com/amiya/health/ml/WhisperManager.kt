@@ -1,17 +1,17 @@
 package com.amiya.health.ml
 
 import android.content.Context
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
 import com.zeticai.mlange.core.model.ZeticMLangeModel
 import com.zeticai.mlange.core.model.ModelMode
-import com.zeticai.mlange.core.model.tensor.Tensor
-import com.zeticai.mlange.core.model.tensor.TensorDataType
+import com.zeticai.mlange.core.tensor.Tensor
+import com.zeticai.mlange.core.tensor.DataType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.nio.ByteOrder
 import kotlin.math.log10
 import kotlin.math.max
+import kotlin.math.cos
+import kotlin.math.sqrt
 
 class WhisperManager(private val context: Context) {
 
@@ -23,10 +23,10 @@ class WhisperManager(private val context: Context) {
     private val N_FFT = 400
     private val HOP_LENGTH = 160
     private val N_MELS = 80
-    private val CHUNK_LENGTH = 30  // seconds
+    private val CHUNK_LENGTH = 30
     private val N_SAMPLES = SAMPLE_RATE * CHUNK_LENGTH
+    private val NUM_FRAMES = 3000
 
-    // Whisper token IDs
     private val SOT_TOKEN = 50258
     private val EN_TOKEN = 50259
     private val TRANSCRIBE_TOKEN = 50359
@@ -61,10 +61,11 @@ class WhisperManager(private val context: Context) {
 
         val melFeatures = extractMelSpectrogram(audioFloats)
 
-        val melTensor = Tensor.fromFloatArray(
+        val melTensor = Tensor.of(
             melFeatures,
-            longArrayOf(1, N_MELS.toLong(), 3000L),
-            TensorDataType.FLOAT32
+            DataType.Float32,
+            intArrayOf(1, N_MELS, NUM_FRAMES),
+            false
         )
         val encoderOutputs = encoder.run(arrayOf(melTensor))
 
@@ -72,17 +73,21 @@ class WhisperManager(private val context: Context) {
         val sb = StringBuilder()
 
         repeat(MAX_NEW_TOKENS) {
-            val tokensTensor = Tensor.fromIntArray(
-                tokens.toIntArray(),
-                longArrayOf(1, tokens.size.toLong()),
-                TensorDataType.INT32
+            val tokenArray = tokens.toIntArray()
+            val tokensTensor = Tensor.of(
+                tokenArray,
+                DataType.Int32,
+                intArrayOf(1, tokenArray.size),
+                false
             )
-            val inputs = arrayOf(encoderOutputs[0], tokensTensor)
-            val decoderOutputs = decoder.run(inputs)
+            val decoderOutputs = decoder.run(arrayOf(encoderOutputs[0], tokensTensor))
 
-            val logits = decoderOutputs[0].floatArray
-            val lastTokenLogits = logits.takeLast(logits.size / tokens.size).toFloatArray()
-            val nextToken = lastTokenLogits.indices.maxByOrNull { lastTokenLogits[it] } ?: EOT_TOKEN
+            val logits = readFloats(decoderOutputs[0])
+            val stride = if (tokens.size > 0) logits.size / tokens.size else logits.size
+            val lastTokenStart = (tokens.size - 1) * stride
+            val lastLogits = logits.copyOfRange(lastTokenStart, lastTokenStart + stride)
+
+            val nextToken = lastLogits.indices.maxByOrNull { lastLogits[it] } ?: EOT_TOKEN
 
             if (nextToken == EOT_TOKEN) return@repeat
             tokens.add(nextToken)
@@ -92,6 +97,14 @@ class WhisperManager(private val context: Context) {
         sb.toString().trim()
     }
 
+    private fun readFloats(tensor: Tensor): FloatArray {
+        val buf = tensor.data
+        buf.rewind()
+        buf.order(ByteOrder.nativeOrder())
+        val fb = buf.asFloatBuffer()
+        return FloatArray(fb.remaining()) { fb.get() }
+    }
+
     private fun extractMelSpectrogram(audio: FloatArray): FloatArray {
         val paddedAudio = if (audio.size < N_SAMPLES) {
             audio + FloatArray(N_SAMPLES - audio.size)
@@ -99,11 +112,10 @@ class WhisperManager(private val context: Context) {
             audio.copyOf(N_SAMPLES)
         }
 
-        val numFrames = 3000
-        val melSpec = Array(N_MELS) { FloatArray(numFrames) }
+        val melSpec = Array(N_MELS) { FloatArray(NUM_FRAMES) }
         val melFilterbank = buildMelFilterbank()
 
-        for (frame in 0 until numFrames) {
+        for (frame in 0 until NUM_FRAMES) {
             val start = frame * HOP_LENGTH
             val frameData = FloatArray(N_FFT) { i ->
                 if (start + i < paddedAudio.size) paddedAudio[start + i] else 0f
@@ -120,18 +132,18 @@ class WhisperManager(private val context: Context) {
             }
         }
 
-        val logMelSpec = FloatArray(N_MELS * numFrames)
+        val logMelSpec = FloatArray(N_MELS * NUM_FRAMES)
         var maxVal = Float.NEGATIVE_INFINITY
         for (m in 0 until N_MELS) {
-            for (f in 0 until numFrames) {
+            for (f in 0 until NUM_FRAMES) {
                 val v = 10f * log10(melSpec[m][f])
-                logMelSpec[m * numFrames + f] = v
+                logMelSpec[m * NUM_FRAMES + f] = v
                 if (v > maxVal) maxVal = v
             }
         }
-        val threshold = maxVal - 8f * 10f
+        val threshold = maxVal - 80f
         for (i in logMelSpec.indices) {
-            logMelSpec[i] = (maxOf(logMelSpec[i], threshold) + 4f * 10f) / (4f * 10f)
+            logMelSpec[i] = (max(logMelSpec[i], threshold) + 40f) / 40f
         }
 
         return logMelSpec
@@ -163,7 +175,7 @@ class WhisperManager(private val context: Context) {
 
     private fun applyHannWindow(frame: FloatArray) {
         for (i in frame.indices) {
-            frame[i] *= (0.5f * (1f - kotlin.math.cos(2.0 * Math.PI * i / (frame.size - 1)).toFloat()))
+            frame[i] *= (0.5f * (1f - cos(2.0 * Math.PI * i / (frame.size - 1)).toFloat()))
         }
     }
 
@@ -173,7 +185,7 @@ class WhisperManager(private val context: Context) {
         val imag = FloatArray(n)
         fft(real, imag)
         return FloatArray(n / 2 + 1) { i ->
-            kotlin.math.sqrt(real[i] * real[i] + imag[i] * imag[i])
+            sqrt(real[i] * real[i] + imag[i] * imag[i])
         }
     }
 
@@ -183,7 +195,7 @@ class WhisperManager(private val context: Context) {
         while (len <= n) {
             val halfLen = len / 2
             val angle = -2.0 * Math.PI / len
-            val wRe = kotlin.math.cos(angle).toFloat()
+            val wRe = cos(angle).toFloat()
             val wIm = kotlin.math.sin(angle).toFloat()
             var i = 0
             while (i < n) {
@@ -204,18 +216,19 @@ class WhisperManager(private val context: Context) {
     }
 
     private fun whisperTokenToText(token: Int): String {
-        // Whisper uses byte-level BPE; for a full implementation, load the tokenizer vocab.
-        // This stub returns the token as a placeholder; in production load whisper's vocab.json.
+        // Full tokenizer requires loading vocab.json from assets;
+        // returning empty here keeps the pipeline compilable.
         return ""
     }
 
     fun release() {
+        encoderModel?.close()
         encoderModel = null
+        decoderModel?.close()
         decoderModel = null
     }
 }
 
-// Extension to concatenate float arrays
 private operator fun FloatArray.plus(other: FloatArray): FloatArray {
     val result = FloatArray(size + other.size)
     System.arraycopy(this, 0, result, 0, size)
