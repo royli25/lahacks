@@ -5,11 +5,15 @@ __pycache__/
 .env
 node_modules/
 ReactTS/node_modules/
-*.local
 .idea/
 *.iml
+
+# Android - local machine config (not portable)
+local.properties
+
+# Android - build outputs and caches
 .gradle/
-Kotlin/local.properties
 Kotlin/app/build/
-Kotlin/.gradle/
 Kotlin/build/
+
+# Keep: gradlew, gradlew.bat, gradle/wrapper/ — required for building
