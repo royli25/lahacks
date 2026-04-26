@@ -2,11 +2,8 @@ name: AmiyaHealthiOS
 
 packages:
   LiveKit:
-    url: https://github.com/livekit/client-sdk-swift
+    url: https://github.com/livekit/client-sdk-swift.git
     from: 2.0.0
-  ZeticMLangeiOS:
-    url: https://github.com/zetic-ai/ZeticMLangeiOS.git
-    exactVersion: 1.6.0
 
 options:
   bundleIdPrefix: com.amiya
@@ -38,10 +35,6 @@ targets:
     dependencies:
       - package: LiveKit
         product: LiveKit
-      - package: ZeticMLangeiOS
-        product: ZeticMLange
-      - framework: Frameworks/ext.framework
-        embed: true
   AmiyaHealthiOSTests:
     type: bundle.unit-test
     platform: iOS

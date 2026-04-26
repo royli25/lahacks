@@ -18,7 +18,7 @@ final class AudioChunkTranscriptCaptureService: TranscriptCaptureServiceProtocol
         }
 
         if !granted {
-            throw ServiceError.unsupported("Microphone permission is required for local Zetic transcription.")
+            throw ServiceError.unsupported("Microphone permission is required for local transcription.")
         }
     }
 

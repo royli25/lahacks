@@ -17,16 +17,15 @@ The current avatar path works well enough to prove that LiveAvatar sessions can 
 - app routing and screen scaffolding
 - Codable models mapped from the Kotlin data layer
 - backend and LiveAvatar API clients
-- Zetic MLange local Whisper/Gemma service wiring for on-device STT and local reasoning
+- direct LiveAvatar/LiveKit call setup for HeyGen-only testing
 - a `CheckupViewModel` built around an explicit `Start Visit` action instead of auto-starting paid sessions
 - migration docs and a Kotlin-to-Swift feature audit
 - XcodeGen project scaffolding
 
 ## What is intentionally not finished yet
 
-- native LiveKit video rendering
 - iOS auth integration
-- production-tuned Whisper chunking/prompt tuning for a real device session
+- local Zetic Whisper/Gemma STT and reasoning, which is temporarily disabled in this test build
 - persistent dashboard history
 
 Those are called out in [Docs/MigrationPlan.md](./Docs/MigrationPlan.md).
@@ -38,12 +37,12 @@ Those are called out in [Docs/MigrationPlan.md](./Docs/MigrationPlan.md).
 3. Install [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 4. Run `xcodegen generate` from this folder.
 5. Open the generated Xcode project.
-6. Confirm the generated project resolves LiveKit and ZeticMLange through Swift Package Manager, plus the local `Frameworks/ext.framework` Whisper helper.
-7. Run on a real iPhone for microphone, local model download, and LiveKit validation.
+6. Confirm the generated project resolves the LiveKit Swift package.
+7. Run on a real iPhone for microphone and LiveKit validation.
 
 ## Important migration decisions
 
 - Do not port the Android WebView avatar approach to iOS.
 - Do not auto-start paid avatar sessions on screen open.
-- Keep Zetic Whisper/Gemma behind service protocols so model instructions can evolve without rewriting the visit flow.
+- Keep Zetic Whisper/Gemma behind service protocols when the local model path is re-enabled later.
 - Keep the backend summarization path available as the first working transcript/summary implementation.

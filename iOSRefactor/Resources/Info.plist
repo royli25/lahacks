@@ -36,16 +36,6 @@
 	<string>$(AVATAR_SPEECH_API_BASE_URL)</string>
 	<key>AvatarSpeechTaskPath</key>
 	<string>$(AVATAR_SPEECH_TASK_PATH)</string>
-	<key>ZeticPersonalKey</key>
-	<string>$(ZETIC_PERSONAL_KEY)</string>
-	<key>ZeticWhisperEncoderModel</key>
-	<string>$(ZETIC_WHISPER_ENCODER_MODEL)</string>
-	<key>ZeticWhisperDecoderModel</key>
-	<string>$(ZETIC_WHISPER_DECODER_MODEL)</string>
-	<key>ZeticGemmaModel</key>
-	<string>$(ZETIC_GEMMA_MODEL)</string>
-	<key>ZeticModelVersion</key>
-	<string>$(ZETIC_MODEL_VERSION)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

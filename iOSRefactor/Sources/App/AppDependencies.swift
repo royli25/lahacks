@@ -11,7 +11,7 @@ final class AppDependencies {
         self.environment = environment
         self.backendService = BackendAPIClient(environment: environment)
         self.liveAvatarService = LiveAvatarAPIClient(environment: environment)
-        self.localVisitAIService = ZeticVisitAIService(configuration: environment.zeticConfiguration)
-        self.transcriptCaptureService = AudioChunkTranscriptCaptureService()
+        self.localVisitAIService = DisabledLocalVisitAIService()
+        self.transcriptCaptureService = PlaceholderTranscriptCaptureService()
     }
 }
