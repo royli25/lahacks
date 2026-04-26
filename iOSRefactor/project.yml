@@ -3,7 +3,7 @@ name: AmiyaHealthiOS
 packages:
   LiveKit:
     url: https://github.com/livekit/client-sdk-swift.git
-    exactVersion: 2.13.0
+    exactVersion: 2.12.1
 
 options:
   bundleIdPrefix: com.amiya
@@ -14,7 +14,7 @@ settings:
   base:
     PRODUCT_NAME: AmiyaHealthiOS
     PRODUCT_BUNDLE_IDENTIFIER: com.amiya.health.ios
-    SWIFT_VERSION: "6.0"
+    SWIFT_VERSION: "5.9"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     INFOPLIST_FILE: Resources/Info.plist
     CURRENT_PROJECT_VERSION: 1
