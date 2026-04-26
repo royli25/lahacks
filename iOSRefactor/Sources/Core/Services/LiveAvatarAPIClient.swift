@@ -17,13 +17,18 @@ final class LiveAvatarAPIClient: LiveAvatarSessionServiceProtocol {
         }
 
         let config = DoctorDirectory.liveAvatarConfig(for: doctorID)
+        let contextID = environment.liveAvatarContextID(for: doctorID)
 
         let tokenResponse: LiveAvatarTokenResponse = try await performRequest(
             path: "sessions/token",
             method: "POST",
             body: LiveAvatarTokenRequest(
                 avatarID: config.avatarID,
-                avatarPersona: LiveAvatarPersonaRequest(voiceID: config.voiceID)
+                avatarPersona: LiveAvatarPersonaRequest(
+                    voiceID: config.voiceID,
+                    contextID: contextID,
+                    language: "en"
+                )
             ),
             headers: ["X-API-KEY": environment.liveAvatarAPIKey]
         )

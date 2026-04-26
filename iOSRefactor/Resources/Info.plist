@@ -24,6 +24,14 @@
 	<string>$(LIVEAVATAR_API_BASE_URL)</string>
 	<key>LiveAvatarAPIKey</key>
 	<string>$(LIVEAVATAR_API_KEY)</string>
+	<key>LiveAvatarDefaultContextID</key>
+	<string>$(LIVEAVATAR_DEFAULT_CONTEXT_ID)</string>
+	<key>LiveAvatarAlphaContextID</key>
+	<string>$(LIVEAVATAR_ALPHA_CONTEXT_ID)</string>
+	<key>LiveAvatarBetaContextID</key>
+	<string>$(LIVEAVATAR_BETA_CONTEXT_ID)</string>
+	<key>LiveAvatarGammaContextID</key>
+	<string>$(LIVEAVATAR_GAMMA_CONTEXT_ID)</string>
 	<key>AvatarSpeechAPIBaseURL</key>
 	<string>$(AVATAR_SPEECH_API_BASE_URL)</string>
 	<key>AvatarSpeechTaskPath</key>

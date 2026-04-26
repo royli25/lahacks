@@ -28,25 +28,36 @@ struct StartRequest: Codable, Hashable {
 
 struct LiveAvatarPersonaRequest: Codable, Hashable {
     let voiceID: String
+    let contextID: String?
     let language: String
 
-    init(voiceID: String, language: String = "en") {
+    init(voiceID: String, contextID: String? = nil, language: String = "en") {
         self.voiceID = voiceID
+        self.contextID = contextID
         self.language = language
     }
 
     enum CodingKeys: String, CodingKey {
         case voiceID = "voice_id"
+        case contextID = "context_id"
         case language
     }
 }
 
 struct LiveAvatarTokenRequest: Codable, Hashable {
+    static let fullMode = "FULL"
+
     let mode: String
     let avatarID: String
     let avatarPersona: LiveAvatarPersonaRequest
 
-    init(mode: String = "FULL", avatarID: String, avatarPersona: LiveAvatarPersonaRequest) {
+    init(avatarID: String, avatarPersona: LiveAvatarPersonaRequest) {
+        self.mode = Self.fullMode
+        self.avatarID = avatarID
+        self.avatarPersona = avatarPersona
+    }
+
+    init(mode: String, avatarID: String, avatarPersona: LiveAvatarPersonaRequest) {
         self.mode = mode
         self.avatarID = avatarID
         self.avatarPersona = avatarPersona

@@ -1,5 +1,6 @@
 import SwiftUI
 import LiveKit
+import AVFoundation
 
 struct NativeAvatarView: View {
     let session: LiveAvatarSessionPayload?
@@ -111,6 +112,7 @@ final class RoomContext: NSObject, ObservableObject {
 
     func connect(url: String, token: String, microphoneEnabled: Bool) async {
         do {
+            try configureAudioSession()
             try await room.connect(url: url, token: token)
             await setMicrophone(enabled: microphoneEnabled)
         } catch {
@@ -133,6 +135,17 @@ final class RoomContext: NSObject, ObservableObject {
         await room.disconnect()
         firstRemoteVideoTrack = nil
         isMicrophoneEnabled = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private func configureAudioSession() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(
+            .playAndRecord,
+            mode: .voiceChat,
+            options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
+        )
+        try session.setActive(true)
     }
 }
 
