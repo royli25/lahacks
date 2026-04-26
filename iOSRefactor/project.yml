@@ -1,5 +1,10 @@
 name: AmiyaHealthiOS
 
+packages:
+  LiveKit:
+    url: https://github.com/livekit/client-sdk-swift
+    from: 2.0.0
+
 options:
   bundleIdPrefix: com.amiya
   deploymentTarget:
@@ -27,6 +32,9 @@ targets:
     configFiles:
       Debug: Config/Secrets.xcconfig
       Release: Config/Secrets.xcconfig
+    dependencies:
+      - package: LiveKit
+        product: LiveKit
   AmiyaHealthiOSTests:
     type: bundle.unit-test
     platform: iOS
@@ -38,6 +46,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.amiya.health.ios.tests
         GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_MODULE_NAME: AmiyaHealthiOSTests
 
 schemes:
   AmiyaHealthiOS:
