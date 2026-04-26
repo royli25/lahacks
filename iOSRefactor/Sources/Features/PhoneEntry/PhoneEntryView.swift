@@ -20,69 +20,75 @@ struct PhoneEntryView: View {
 
     var body: some View {
         AmiyaScreen {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Enter Phone Number")
-                    .font(.largeTitle.bold())
-                    .foregroundStyle(AmiyaPalette.dark)
-                    .padding(.top, 32)
-                    .padding(.horizontal, 24)
-
-                Text("We'll send your appointment link via SMS.")
-                    .foregroundStyle(AmiyaPalette.gray)
-                    .padding(.horizontal, 24)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Appointment Summary")
-                        .font(.headline)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Enter Phone Number")
+                        .font(.largeTitle.bold())
                         .foregroundStyle(AmiyaPalette.dark)
-                    summaryRow(label: "Patient", value: patientName)
-                    summaryRow(label: "Doctor", value: doctor.agentName)
-                }
-                .padding(20)
-                .background(Color.white.opacity(0.8))
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .padding(.horizontal, 24)
-
-                TextField("(555) 555-5555", text: Binding(
-                    get: { format(viewModel.phoneDigits) },
-                    set: { value in
-                        viewModel.phoneDigits = String(value.filter { $0.isNumber }.prefix(10))
-                    }
-                ))
-                .keyboardType(.phonePad)
-                .textFieldStyle(.roundedBorder)
-                .padding(.horizontal, 24)
-
-                if !viewModel.errorMessage.isEmpty {
-                    Text(viewModel.errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                        .padding(.top, 16)
                         .padding(.horizontal, 24)
-                }
+                        .fixedSize(horizontal: false, vertical: true)
 
-                Button {
-                    Task {
-                        if let uid = await viewModel.register(patientName: patientName, doctor: doctor) {
-                            onRegistered(uid)
+                    Text("We'll send your appointment link via SMS.")
+                        .foregroundStyle(AmiyaPalette.gray)
+                        .padding(.horizontal, 24)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Appointment Summary")
+                            .font(.headline)
+                            .foregroundStyle(AmiyaPalette.dark)
+                        summaryRow(label: "Patient", value: patientName)
+                        summaryRow(label: "Doctor", value: doctor.agentName)
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .padding(.horizontal, 24)
+
+                    TextField("(555) 555-5555", text: Binding(
+                        get: { format(viewModel.phoneDigits) },
+                        set: { value in
+                            viewModel.phoneDigits = String(value.filter { $0.isNumber }.prefix(10))
+                        }
+                    ))
+                    .keyboardType(.phonePad)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal, 24)
+
+                    if !viewModel.errorMessage.isEmpty {
+                        Text(viewModel.errorMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 24)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Button {
+                        Task {
+                            if let uid = await viewModel.register(patientName: patientName, doctor: doctor) {
+                                onRegistered(uid)
+                            }
+                        }
+                    } label: {
+                        if viewModel.isLoading {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(AmiyaPalette.dark)
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            Text("Start Checkup")
+                                .frame(maxWidth: .infinity)
                         }
                     }
-                } label: {
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(AmiyaPalette.dark)
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Text("Start Checkup")
-                            .frame(maxWidth: .infinity)
-                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AmiyaPalette.purple)
+                    .disabled(viewModel.phoneDigits.count != 10 || viewModel.isLoading)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 32)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(AmiyaPalette.purple)
-                .disabled(viewModel.phoneDigits.count != 10 || viewModel.isLoading)
-                .padding(.horizontal, 24)
-
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .navigationBarTitleDisplayMode(.inline)

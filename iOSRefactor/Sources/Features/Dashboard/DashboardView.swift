@@ -34,11 +34,13 @@ struct DashboardView: View {
                         Text(patientName)
                             .font(.largeTitle.bold())
                             .foregroundStyle(AmiyaPalette.dark)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text("Patient Dashboard - UID: \(uid)")
                             .foregroundStyle(AmiyaPalette.gray)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 32)
+                    .padding(.top, 16)
 
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
@@ -73,21 +75,26 @@ struct DashboardView: View {
                                 .foregroundStyle(AmiyaPalette.dark)
                             Text(record.summary)
                                 .foregroundStyle(AmiyaPalette.gray)
+                                .fixedSize(horizontal: false, vertical: true)
                             if !record.nextSteps.isEmpty {
                                 VStack(alignment: .leading, spacing: 4) {
                                     ForEach(record.nextSteps, id: \.self) { step in
                                         Text("- \(step)")
                                             .foregroundStyle(AmiyaPalette.dark)
+                                            .fixedSize(horizontal: false, vertical: true)
                                     }
                                 }
                             }
                         }
                         .padding(20)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.white)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                         .padding(.horizontal, 24)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 32)
             }
         }
         .navigationBarTitleDisplayMode(.inline)

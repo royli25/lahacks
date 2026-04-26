@@ -8,18 +8,20 @@ struct DoctorSelectionView: View {
 
     var body: some View {
         AmiyaScreen {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Choose Your Doctor")
-                    .font(.largeTitle.bold())
-                    .foregroundStyle(AmiyaPalette.dark)
-                    .padding(.top, 32)
-                    .padding(.horizontal, 24)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Choose Your Doctor")
+                        .font(.largeTitle.bold())
+                        .foregroundStyle(AmiyaPalette.dark)
+                        .padding(.top, 16)
+                        .padding(.horizontal, 24)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                Text("Hi \(patientName)! Select a doctor for your checkup.")
-                    .foregroundStyle(AmiyaPalette.gray)
-                    .padding(.horizontal, 24)
+                    Text("Hi \(patientName)! Select a doctor for your checkup.")
+                        .foregroundStyle(AmiyaPalette.gray)
+                        .padding(.horizontal, 24)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                ScrollView {
                     VStack(spacing: 16) {
                         ForEach(DoctorDirectory.profiles) { doctor in
                             Button {
@@ -54,19 +56,21 @@ struct DoctorSelectionView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
-                }
 
-                Button("Continue with Selected Doctor") {
-                    guard let selectedDoctor = DoctorDirectory.profiles.first(where: { $0.id == selectedDoctorID }) else {
-                        return
+                    Button("Continue with Selected Doctor") {
+                        guard let selectedDoctor = DoctorDirectory.profiles.first(where: { $0.id == selectedDoctorID }) else {
+                            return
+                        }
+                        onDoctorSelected(selectedDoctor)
                     }
-                    onDoctorSelected(selectedDoctor)
+                    .buttonStyle(.borderedProminent)
+                    .tint(AmiyaPalette.purple)
+                    .disabled(selectedDoctorID == nil)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 32)
+                    .padding(.top, 16)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(AmiyaPalette.purple)
-                .disabled(selectedDoctorID == nil)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
