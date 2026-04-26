@@ -95,7 +95,9 @@ struct AppCoordinatorView: View {
                             patientName: patientName,
                             doctor: doctor,
                             backendService: coordinator.dependencies.backendService,
-                            liveAvatarService: coordinator.dependencies.liveAvatarService
+                            liveAvatarService: coordinator.dependencies.liveAvatarService,
+                            localVisitAIService: coordinator.dependencies.localVisitAIService,
+                            transcriptCaptureService: coordinator.dependencies.transcriptCaptureService
                         ),
                         onEndCall: {
                             coordinator.resetToHome()

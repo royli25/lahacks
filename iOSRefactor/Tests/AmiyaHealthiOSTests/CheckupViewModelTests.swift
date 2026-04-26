@@ -22,6 +22,7 @@ final class CheckupViewModelTests: XCTestCase {
             doctor: DoctorDirectory.profiles[0],
             backendService: backend,
             liveAvatarService: liveAvatar,
+            localVisitAIService: LocalVisitAIServiceMock(),
             transcriptCaptureService: TranscriptCaptureServiceMock()
         )
 
@@ -42,6 +43,7 @@ final class CheckupViewModelTests: XCTestCase {
             doctor: DoctorDirectory.profiles[0],
             backendService: backend,
             liveAvatarService: LiveAvatarServiceMock(),
+            localVisitAIService: LocalVisitAIServiceMock(),
             transcriptCaptureService: TranscriptCaptureServiceMock()
         )
 
@@ -98,10 +100,40 @@ private final class LiveAvatarServiceMock: LiveAvatarSessionServiceProtocol {
     }
 
     func stopSession(sessionID: String?) async throws {}
+
+    func speak(text: String, in session: LiveAvatarSessionPayload, taskType: AvatarSpeechTaskType) async throws {}
 }
 
 private struct TranscriptCaptureServiceMock: TranscriptCaptureServiceProtocol {
     func requestPermissions() async throws {}
-    func beginCapture() async throws {}
+    func beginCapture(onAudioChunk: @escaping ([Float]) async -> Void) async throws {}
     func stopCapture() {}
+}
+
+private struct LocalVisitAIServiceMock: LocalVisitAIServiceProtocol {
+    func preloadWhisper(onProgress: @escaping (Double) -> Void) async throws {
+        onProgress(1)
+    }
+
+    func preloadGemma(onProgress: @escaping (Double) -> Void) async throws {
+        onProgress(1)
+    }
+
+    func transcribe(audioSamples: [Float]) async throws -> String {
+        "I feel tired."
+    }
+
+    func cleanTranscript(rawText: String, patientContext: String) async throws -> String {
+        rawText
+    }
+
+    func generateDoctorReply(transcript: String, patientContext: String) async throws -> String {
+        "How long has that been happening?"
+    }
+
+    func summarizeTranscript(transcript: String, doctorName: String, patientName: String) async throws -> SummaryResponse {
+        SummaryResponse(summary: "Local summary", nextSteps: ["Rest"])
+    }
+
+    func release() async {}
 }

@@ -26,10 +26,11 @@ struct CheckupView: View {
                 }
                 .buttonStyle(.bordered)
 
-                Button("Transcribe") {
-                    Task { await viewModel.requestTranscriptCapture() }
+                Button(viewModel.uiState.isTranscriptionEnabled ? "Stop STT" : "Local STT") {
+                    Task { await viewModel.toggleTranscriptCapture() }
                 }
                 .buttonStyle(.bordered)
+                .disabled(viewModel.uiState.isProcessingTranscript && !viewModel.uiState.isTranscriptionEnabled)
 
                 Button("Summary") {
                     Task { await viewModel.requestSummary() }

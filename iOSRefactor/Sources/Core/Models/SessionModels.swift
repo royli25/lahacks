@@ -136,3 +136,14 @@ struct LiveAvatarStopResponse: Codable, Hashable {
     }
 }
 
+struct AvatarSpeechTaskRequest: Codable, Hashable {
+    let sessionID: String
+    let text: String
+    let taskType: AvatarSpeechTaskType
+
+    enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+        case text
+        case taskType = "task_type"
+    }
+}

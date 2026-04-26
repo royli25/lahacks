@@ -37,9 +37,9 @@ Definition of done:
 
 ## Milestone 4: Transcript capture
 
-- Replace `PlaceholderTranscriptCaptureService`.
-- Start with Apple-native speech APIs or backend-uploaded audio.
-- Keep the service behind `TranscriptCaptureServiceProtocol`.
+- Replace `PlaceholderTranscriptCaptureService` with microphone chunk capture.
+- Run Zetic Whisper encoder/decoder locally on captured 16 kHz audio.
+- Keep the service behind `TranscriptCaptureServiceProtocol` and local model usage behind `LocalVisitAIServiceProtocol`.
 
 Definition of done:
 - The transcript list receives live or near-live entries during a visit.
@@ -48,6 +48,7 @@ Definition of done:
 
 - Send transcript text to the existing backend summary route first.
 - Show summary and next steps in `CheckupView`.
+- Fall back to local Zetic Gemma when the backend summary route is unavailable.
 - Preserve failure states so summary issues do not break the visit flow.
 
 Definition of done:

@@ -6,6 +6,8 @@ struct CheckupUIState {
     var errorMessage: String?
     var isStartingSession = false
     var isMuted = false
+    var isTranscriptionEnabled = false
+    var isProcessingTranscript = false
     var summaryText = ""
     var nextSteps: [String] = []
 }
@@ -21,9 +23,12 @@ final class CheckupViewModel: ObservableObject {
 
     private let backendService: any BackendServiceProtocol
     private let liveAvatarService: any LiveAvatarSessionServiceProtocol
+    private let localVisitAIService: any LocalVisitAIServiceProtocol
     private let transcriptCaptureService: any TranscriptCaptureServiceProtocol
     private let startTime = Date()
     private let timestampFormatter = ISO8601DateFormatter()
+    private var whisperWarmupTask: Task<Void, Never>?
+    private var isProcessingAudioChunk = false
 
     init(
         uid: String,
@@ -31,6 +36,7 @@ final class CheckupViewModel: ObservableObject {
         doctor: DoctorProfile,
         backendService: any BackendServiceProtocol,
         liveAvatarService: any LiveAvatarSessionServiceProtocol,
+        localVisitAIService: any LocalVisitAIServiceProtocol = DisabledLocalVisitAIService(),
         transcriptCaptureService: any TranscriptCaptureServiceProtocol = PlaceholderTranscriptCaptureService()
     ) {
         self.uid = uid
@@ -38,6 +44,7 @@ final class CheckupViewModel: ObservableObject {
         self.doctor = doctor
         self.backendService = backendService
         self.liveAvatarService = liveAvatarService
+        self.localVisitAIService = localVisitAIService
         self.transcriptCaptureService = transcriptCaptureService
         self.timestampFormatter.formatOptions = [.withInternetDateTime]
     }
@@ -57,8 +64,9 @@ final class CheckupViewModel: ObservableObject {
                 doctorID: doctor.id
             )
             uiState.session = session
-            uiState.statusMessage = "Session started. Wire native LiveKit rendering next."
+            uiState.statusMessage = "Session started. Loading local Whisper..."
             appendTranscript(speaker: "Doctor", text: "Hi, \(patientName)!")
+            preloadWhisperInBackground()
         } catch {
             uiState.errorMessage = error.localizedDescription
             uiState.statusMessage = "Unable to connect to doctor"
@@ -67,6 +75,10 @@ final class CheckupViewModel: ObservableObject {
 
     func endVisit() async {
         uiState.errorMessage = nil
+        stopTranscriptCapture()
+        whisperWarmupTask?.cancel()
+        whisperWarmupTask = nil
+        await localVisitAIService.release()
 
         do {
             try await liveAvatarService.stopSession(sessionID: uiState.session?.sessionID)
@@ -85,12 +97,32 @@ final class CheckupViewModel: ObservableObject {
         transcript.append(TranscriptEntry(speaker: speaker, text: text))
     }
 
-    func requestTranscriptCapture() async {
+    func toggleTranscriptCapture() async {
+        if uiState.isTranscriptionEnabled {
+            stopTranscriptCapture()
+            uiState.statusMessage = "Local STT stopped"
+            return
+        }
+
         do {
             try await transcriptCaptureService.requestPermissions()
-            uiState.statusMessage = "Transcript capture permissions granted. Integrate Apple Speech next."
+            uiState.errorMessage = nil
+            uiState.statusMessage = "Loading local Whisper..."
+            try await localVisitAIService.preloadWhisper { [weak self] progress in
+                Task { @MainActor in
+                    self?.uiState.statusMessage = "Loading local Whisper: \(Int(progress * 100))%"
+                }
+            }
+
+            try await transcriptCaptureService.beginCapture { [weak self] audioSamples in
+                await self?.processAudioChunk(audioSamples)
+            }
+
+            uiState.isTranscriptionEnabled = true
+            uiState.statusMessage = "Local STT listening"
         } catch {
             uiState.errorMessage = error.localizedDescription
+            uiState.statusMessage = "Local STT unavailable"
         }
     }
 
@@ -124,8 +156,128 @@ final class CheckupViewModel: ObservableObject {
             uiState.nextSteps = response.nextSteps
             uiState.statusMessage = "Summary ready"
         } catch {
+            await requestLocalSummaryFallback(transcriptText: transcriptText, originalError: error)
+        }
+    }
+
+    private func preloadWhisperInBackground() {
+        guard whisperWarmupTask == nil else {
+            return
+        }
+
+        whisperWarmupTask = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await self.localVisitAIService.preloadWhisper { [weak self] progress in
+                    Task { @MainActor in
+                        guard let self, self.uiState.session != nil, !self.uiState.isTranscriptionEnabled else { return }
+                        self.uiState.statusMessage = "Loading local Whisper: \(Int(progress * 100))%"
+                    }
+                }
+
+                guard !Task.isCancelled else { return }
+                self.uiState.statusMessage = "Session ready. Local STT is available."
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.uiState.errorMessage = error.localizedDescription
+                self.uiState.statusMessage = "Session ready. Local STT needs configuration."
+            }
+        }
+    }
+
+    private func stopTranscriptCapture() {
+        transcriptCaptureService.stopCapture()
+        uiState.isTranscriptionEnabled = false
+        uiState.isProcessingTranscript = false
+        isProcessingAudioChunk = false
+    }
+
+    private func processAudioChunk(_ audioSamples: [Float]) async {
+        guard !isProcessingAudioChunk, uiState.isTranscriptionEnabled, !uiState.isMuted else {
+            return
+        }
+
+        isProcessingAudioChunk = true
+        uiState.isProcessingTranscript = true
+        uiState.statusMessage = "Transcribing locally..."
+
+        defer {
+            isProcessingAudioChunk = false
+            uiState.isProcessingTranscript = false
+        }
+
+        do {
+            let rawText = try await localVisitAIService.transcribe(audioSamples: audioSamples)
+            let cleanedText = try await localVisitAIService.cleanTranscript(
+                rawText: rawText,
+                patientContext: buildPatientContext()
+            )
+            let patientText = cleanedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? rawText : cleanedText
+
+            guard !patientText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                uiState.statusMessage = "Local STT listening"
+                return
+            }
+
+            appendTranscript(speaker: "Patient", text: patientText)
+            uiState.statusMessage = "Generating local doctor response..."
+
+            guard let session = uiState.session else {
+                uiState.statusMessage = "Transcript updated"
+                return
+            }
+
+            let reply = try await localVisitAIService.generateDoctorReply(
+                transcript: transcriptText(),
+                patientContext: buildPatientContext()
+            )
+
+            guard !reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                uiState.statusMessage = "Local STT listening"
+                return
+            }
+
+            appendTranscript(speaker: "Doctor", text: reply)
+            try await liveAvatarService.speak(text: reply, in: session, taskType: .repeat)
+            uiState.statusMessage = "Avatar speaking local Gemma response"
+        } catch {
             uiState.errorMessage = error.localizedDescription
+            uiState.statusMessage = "Local model step failed"
+        }
+    }
+
+    private func requestLocalSummaryFallback(transcriptText: String, originalError: Error) async {
+        uiState.statusMessage = "Backend summary failed. Trying local Gemma..."
+
+        do {
+            let response = try await localVisitAIService.summarizeTranscript(
+                transcript: transcriptText,
+                doctorName: doctor.agentName,
+                patientName: patientName
+            )
+
+            uiState.summaryText = response.summary
+            uiState.nextSteps = response.nextSteps
+            uiState.statusMessage = "Local summary ready"
+        } catch {
+            uiState.errorMessage = "\(originalError.localizedDescription) Local Gemma fallback also failed: \(error.localizedDescription)"
             uiState.statusMessage = "Summary failed"
         }
+    }
+
+    private func transcriptText() -> String {
+        transcript
+            .map { "\($0.speaker): \($0.text)" }
+            .joined(separator: "\n")
+    }
+
+    private func buildPatientContext() -> String {
+        """
+        Patient name: \(patientName).
+        Doctor: \(doctor.agentName).
+        Specialty: \(doctor.specialty).
+        Visit context: live virtual checkup.
+        """
     }
 }
