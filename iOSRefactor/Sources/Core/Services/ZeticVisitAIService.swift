@@ -1,3 +1,4 @@
+#if canImport(ZeticMLange) && canImport(ext)
 import Foundation
 import ZeticMLange
 import ext
@@ -314,3 +315,40 @@ actor ZeticVisitAIService: LocalVisitAIServiceProtocol {
         }
     }
 }
+
+#else
+import Foundation
+
+actor ZeticVisitAIService: LocalVisitAIServiceProtocol {
+    private let configuration: ZeticModelConfiguration
+    init(configuration: ZeticModelConfiguration, bundle: Bundle = .main) {
+        self.configuration = configuration
+    }
+
+    func preloadWhisper(onProgress: @escaping (Double) -> Void) async throws {
+        throw ServiceError.unsupported("Local Zetic Whisper is not configured for this build.")
+    }
+
+    func preloadGemma(onProgress: @escaping (Double) -> Void) async throws {
+        throw ServiceError.unsupported("Local Zetic Gemma is not configured for this build.")
+    }
+
+    func transcribe(audioSamples: [Float]) async throws -> String {
+        throw ServiceError.unsupported("Local Zetic Whisper is not configured for this build.")
+    }
+
+    func cleanTranscript(rawText: String, patientContext: String) async throws -> String {
+        rawText
+    }
+
+    func generateDoctorReply(transcript: String, patientContext: String) async throws -> String {
+        throw ServiceError.unsupported("Local Zetic Gemma is not configured for this build.")
+    }
+
+    func summarizeTranscript(transcript: String, doctorName: String, patientName: String) async throws -> SummaryResponse {
+        throw ServiceError.unsupported("Local Zetic Gemma is not configured for this build.")
+    }
+
+    func release() async {}
+}
+#endif
