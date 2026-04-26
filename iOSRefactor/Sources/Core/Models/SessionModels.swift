@@ -1,45 +1,16 @@
 import Foundation
 
-struct StartRequest: Codable, Hashable {
-    let profileID: String
-    let userName: String
-    let language: String
-    let deterministicGreeting: Bool
-
-    init(
-        profileID: String,
-        userName: String,
-        language: String = "en",
-        deterministicGreeting: Bool = false
-    ) {
-        self.profileID = profileID
-        self.userName = userName
-        self.language = language
-        self.deterministicGreeting = deterministicGreeting
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case profileID = "profile_id"
-        case userName = "user_name"
-        case language
-        case deterministicGreeting = "deterministic_greeting"
-    }
-}
-
 struct LiveAvatarPersonaRequest: Codable, Hashable {
     let voiceID: String
-    let contextID: String?
     let language: String
 
-    init(voiceID: String, contextID: String? = nil, language: String = "en") {
+    init(voiceID: String, language: String = "en") {
         self.voiceID = voiceID
-        self.contextID = contextID
         self.language = language
     }
 
     enum CodingKeys: String, CodingKey {
         case voiceID = "voice_id"
-        case contextID = "context_id"
         case language
     }
 }
@@ -144,17 +115,5 @@ struct LiveAvatarStopResponse: Codable, Hashable {
     enum CodingKeys: String, CodingKey {
         case ok
         case stoppedSessionIDs = "stopped_session_ids"
-    }
-}
-
-struct AvatarSpeechTaskRequest: Codable, Hashable {
-    let sessionID: String
-    let text: String
-    let taskType: AvatarSpeechTaskType
-
-    enum CodingKeys: String, CodingKey {
-        case sessionID = "session_id"
-        case text
-        case taskType = "task_type"
     }
 }

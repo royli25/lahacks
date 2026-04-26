@@ -1,7 +1,7 @@
 import SwiftUI
+
 #if canImport(LiveKit)
-import LiveKit
-import AVFoundation
+@preconcurrency import LiveKit
 
 struct NativeAvatarView: View {
     let session: LiveAvatarSessionPayload?
@@ -9,11 +9,11 @@ struct NativeAvatarView: View {
     let errorMessage: String?
     let isMuted: Bool
 
-    @StateObject private var roomCtx = RoomContext()
+    @StateObject private var roomContext = RoomContext()
 
     var body: some View {
         ZStack {
-            if let track = roomCtx.firstRemoteVideoTrack {
+            if let track = roomContext.firstRemoteVideoTrack {
                 LiveKitVideoView(track: track)
             } else {
                 placeholderView
@@ -21,22 +21,21 @@ struct NativeAvatarView: View {
         }
         .frame(height: 320)
         .clipShape(RoundedRectangle(cornerRadius: 28))
-        // Connect only after the user taps Start Visit; disconnect when session is cleared.
         .task(id: session?.sessionID) {
-            if let s = session,
-               let url = s.livekitURL,
-               let token = s.livekitClientToken {
-                await roomCtx.connect(url: url, token: token, microphoneEnabled: !isMuted)
+            if let session,
+               let url = session.livekitURL,
+               let token = session.livekitClientToken {
+                await roomContext.connect(url: url, token: token, microphoneEnabled: !isMuted)
             } else {
-                await roomCtx.disconnect()
+                await roomContext.disconnect()
             }
         }
         .task(id: isMuted) {
             guard session != nil else { return }
-            await roomCtx.setMicrophone(enabled: !isMuted)
+            await roomContext.setMicrophone(enabled: !isMuted)
         }
         .onDisappear {
-            Task { await roomCtx.disconnect() }
+            Task { await roomContext.disconnect() }
         }
     }
 
@@ -59,15 +58,9 @@ struct NativeAvatarView: View {
                     .font(.system(size: 38))
                     .foregroundStyle(Color.white.opacity(0.85))
 
-                if session != nil {
-                    Text("Connecting to doctor...")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                } else {
-                    Text("Avatar not started")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                }
+                Text(session == nil ? "Avatar not started" : "Connecting to doctor...")
+                    .font(.headline)
+                    .foregroundStyle(.white)
 
                 Text(statusMessage)
                     .font(.footnote)
@@ -85,7 +78,6 @@ struct NativeAvatarView: View {
     }
 }
 
-// UIViewRepresentable wrapper — LiveKit 2.x VideoView is a UIKit view, not SwiftUI.
 private struct LiveKitVideoView: UIViewRepresentable {
     let track: VideoTrack
 
@@ -100,20 +92,14 @@ private struct LiveKitVideoView: UIViewRepresentable {
     }
 }
 
-@MainActor
 final class RoomContext: NSObject, ObservableObject {
-    private let room = Room()
+    private lazy var room = Room(delegate: self)
+
     @Published var firstRemoteVideoTrack: VideoTrack?
     @Published var isMicrophoneEnabled = false
 
-    override init() {
-        super.init()
-        room.add(delegate: self)
-    }
-
     func connect(url: String, token: String, microphoneEnabled: Bool) async {
         do {
-            try configureAudioSession()
             try await room.connect(url: url, token: token)
             await setMicrophone(enabled: microphoneEnabled)
         } catch {
@@ -124,9 +110,13 @@ final class RoomContext: NSObject, ObservableObject {
     func setMicrophone(enabled: Bool) async {
         do {
             try await room.localParticipant.setMicrophone(enabled: enabled)
-            isMicrophoneEnabled = enabled
+            await MainActor.run {
+                isMicrophoneEnabled = enabled
+            }
         } catch {
-            isMicrophoneEnabled = false
+            await MainActor.run {
+                isMicrophoneEnabled = false
+            }
             print("[LiveKit] microphone error: \(error)")
         }
     }
@@ -134,39 +124,34 @@ final class RoomContext: NSObject, ObservableObject {
     func disconnect() async {
         await setMicrophone(enabled: false)
         await room.disconnect()
-        firstRemoteVideoTrack = nil
-        isMicrophoneEnabled = false
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    }
-
-    private func configureAudioSession() throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(
-            .playAndRecord,
-            mode: .voiceChat,
-            options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
-        )
-        try session.setActive(true)
+        await MainActor.run {
+            firstRemoteVideoTrack = nil
+            isMicrophoneEnabled = false
+        }
     }
 }
 
 extension RoomContext: RoomDelegate {
-    nonisolated func room(
+    func room(
         _ room: Room,
         participant: RemoteParticipant,
         didSubscribeTrack publication: RemoteTrackPublication
     ) {
         guard let track = publication.track as? VideoTrack else { return }
-        Task { @MainActor in self.firstRemoteVideoTrack = track }
+        DispatchQueue.main.async { [weak self] in
+            self?.firstRemoteVideoTrack = track
+        }
     }
 
-    nonisolated func room(
+    func room(
         _ room: Room,
         participant: RemoteParticipant,
         didUnsubscribeTrack publication: RemoteTrackPublication
     ) {
         guard publication.track is VideoTrack else { return }
-        Task { @MainActor in self.firstRemoteVideoTrack = nil }
+        DispatchQueue.main.async { [weak self] in
+            self?.firstRemoteVideoTrack = nil
+        }
     }
 }
 
@@ -197,15 +182,9 @@ struct NativeAvatarView: View {
                     .font(.system(size: 38))
                     .foregroundStyle(Color.white.opacity(0.85))
 
-                if session != nil {
-                    Text("Connecting to doctor...")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                } else {
-                    Text("Avatar not started")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                }
+                Text(session == nil ? "Avatar not started" : "LiveKit unavailable")
+                    .font(.headline)
+                    .foregroundStyle(.white)
 
                 Text(statusMessage)
                     .font(.footnote)

@@ -2,7 +2,6 @@ import SwiftUI
 
 struct HomeView: View {
     let onStartCheckup: (String) -> Void
-    let onViewDashboard: () -> Void
 
     @State private var patientName = ""
     @State private var showError = false
@@ -61,9 +60,7 @@ struct HomeView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .padding(.horizontal, 24)
 
-                    Button("View past checkups", action: onViewDashboard)
-                        .foregroundStyle(AmiyaPalette.gray)
-                        .padding(.bottom, 32)
+                    Spacer(minLength: 32)
                 }
                 .frame(maxWidth: .infinity)
             }

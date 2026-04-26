@@ -3,14 +3,12 @@ import Foundation
 struct DoctorProfile: Identifiable, Codable, Hashable {
     let id: String
     let agentName: String
-    let avatarID: String
     let displayName: String
     let specialty: String
 
     enum CodingKeys: String, CodingKey {
         case id
         case agentName = "agent_name"
-        case avatarID = "avatar_id"
         case displayName
         case specialty
     }
@@ -26,21 +24,18 @@ enum DoctorDirectory {
         DoctorProfile(
             id: "alpha",
             agentName: "Dr. Carol Lee",
-            avatarID: "alpha_avatar",
             displayName: "Dr. Carol Lee",
             specialty: "Internal Medicine"
         ),
         DoctorProfile(
             id: "beta",
             agentName: "Dr. Dexter Sins",
-            avatarID: "beta_avatar",
             displayName: "Dr. Dexter Sins",
             specialty: "Family Medicine"
         ),
         DoctorProfile(
             id: "gamma",
             agentName: "Dr. Karen Roberts",
-            avatarID: "gamma_avatar",
             displayName: "Dr. Karen Roberts",
             specialty: "Geriatrics"
         )

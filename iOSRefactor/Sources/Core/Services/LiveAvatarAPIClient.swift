@@ -17,7 +17,6 @@ final class LiveAvatarAPIClient: LiveAvatarSessionServiceProtocol {
         }
 
         let config = DoctorDirectory.liveAvatarConfig(for: doctorID)
-        let contextID = environment.liveAvatarContextID(for: doctorID)
 
         let tokenResponse: LiveAvatarTokenResponse = try await performRequest(
             path: "sessions/token",
@@ -26,7 +25,6 @@ final class LiveAvatarAPIClient: LiveAvatarSessionServiceProtocol {
                 avatarID: config.avatarID,
                 avatarPersona: LiveAvatarPersonaRequest(
                     voiceID: config.voiceID,
-                    contextID: contextID,
                     language: "en"
                 )
             ),
@@ -72,29 +70,6 @@ final class LiveAvatarAPIClient: LiveAvatarSessionServiceProtocol {
         ) as LiveAvatarStopResponse
     }
 
-    func speak(text: String, in session: LiveAvatarSessionPayload, taskType: AvatarSpeechTaskType = .repeat) async throws {
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedText.isEmpty else {
-            return
-        }
-
-        guard let sessionID = session.sessionID, !sessionID.isEmpty else {
-            throw ServiceError.invalidResponse
-        }
-
-        try await performVoidRequest(
-            baseURL: environment.avatarSpeechAPIBaseURL,
-            path: environment.avatarSpeechTaskPath,
-            method: "POST",
-            body: AvatarSpeechTaskRequest(
-                sessionID: sessionID,
-                text: trimmedText,
-                taskType: taskType
-            ),
-            headers: ["Authorization": "Bearer \(session.sessionToken)"]
-        )
-    }
-
     private func performRequest<ResponseType: Decodable, BodyType: Encodable>(
         path: String,
         method: String,
@@ -122,33 +97,5 @@ final class LiveAvatarAPIClient: LiveAvatarSessionServiceProtocol {
 
         let message = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
         throw ServiceError.server(message: message)
-    }
-
-    private func performVoidRequest<BodyType: Encodable>(
-        baseURL: URL,
-        path: String,
-        method: String,
-        body: BodyType?,
-        headers: [String: String]
-    ) async throws {
-        let url = baseURL.appending(path: path)
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-
-        if let body {
-            request.httpBody = try JSONEncoder().encode(body)
-        }
-
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw ServiceError.invalidResponse
-        }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
-            throw ServiceError.server(message: message)
-        }
     }
 }

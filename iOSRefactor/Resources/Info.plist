@@ -18,24 +18,10 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>BackendBaseURL</key>
-	<string>$(BACKEND_BASE_URL)</string>
 	<key>LiveAvatarAPIBaseURL</key>
 	<string>$(LIVEAVATAR_API_BASE_URL)</string>
 	<key>LiveAvatarAPIKey</key>
 	<string>$(LIVEAVATAR_API_KEY)</string>
-	<key>LiveAvatarDefaultContextID</key>
-	<string>$(LIVEAVATAR_DEFAULT_CONTEXT_ID)</string>
-	<key>LiveAvatarAlphaContextID</key>
-	<string>$(LIVEAVATAR_ALPHA_CONTEXT_ID)</string>
-	<key>LiveAvatarBetaContextID</key>
-	<string>$(LIVEAVATAR_BETA_CONTEXT_ID)</string>
-	<key>LiveAvatarGammaContextID</key>
-	<string>$(LIVEAVATAR_GAMMA_CONTEXT_ID)</string>
-	<key>AvatarSpeechAPIBaseURL</key>
-	<string>$(AVATAR_SPEECH_API_BASE_URL)</string>
-	<key>AvatarSpeechTaskPath</key>
-	<string>$(AVATAR_SPEECH_TASK_PATH)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
@@ -44,7 +30,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is used during live virtual checkups.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Microphone access is used during live virtual checkups and transcription.</string>
+	<string>Microphone access is used during live virtual checkups.</string>
 </dict>
 </plist>
 

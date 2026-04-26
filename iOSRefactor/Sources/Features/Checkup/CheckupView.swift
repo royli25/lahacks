@@ -26,11 +26,7 @@ struct CheckupView: View {
                     viewModel.toggleMute()
                 }
                 .buttonStyle(.bordered)
-
-                Button("Summary") {
-                    Task { await viewModel.requestSummary() }
-                }
-                .buttonStyle(.bordered)
+                .disabled(viewModel.uiState.session == nil)
 
                 Button("End Call", role: .destructive) {
                     Task {
@@ -59,37 +55,7 @@ struct CheckupView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
             }
-
-            if !viewModel.uiState.summaryText.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Summary")
-                        .font(.headline)
-                    Text(viewModel.uiState.summaryText)
-                        .foregroundStyle(AmiyaPalette.gray)
-
-                    if !viewModel.uiState.nextSteps.isEmpty {
-                        Text("Next Steps")
-                            .font(.headline)
-                            .padding(.top, 4)
-                        ForEach(viewModel.uiState.nextSteps, id: \.self) { step in
-                            Text("- \(step)")
-                        }
-                    }
-                }
-                .padding(20)
-            }
-
-            List(viewModel.transcript) { entry in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.speaker)
-                        .font(.caption)
-                        .foregroundStyle(AmiyaPalette.gray)
-                    Text(entry.text)
-                        .foregroundStyle(AmiyaPalette.dark)
-                }
-                .padding(.vertical, 4)
-            }
-            .listStyle(.plain)
+            Spacer()
         }
         .background(AmiyaPalette.background.ignoresSafeArea())
         .navigationTitle(viewModel.patientName)

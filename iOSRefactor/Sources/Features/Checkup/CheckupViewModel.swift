@@ -6,46 +6,25 @@ struct CheckupUIState {
     var errorMessage: String?
     var isStartingSession = false
     var isMuted = false
-    var isTranscriptionEnabled = false
-    var isProcessingTranscript = false
-    var summaryText = ""
-    var nextSteps: [String] = []
 }
 
 @MainActor
 final class CheckupViewModel: ObservableObject {
     @Published private(set) var uiState = CheckupUIState()
-    @Published private(set) var transcript: [TranscriptEntry] = []
 
-    let uid: String
     let patientName: String
     let doctor: DoctorProfile
 
-    private let backendService: any BackendServiceProtocol
     private let liveAvatarService: any LiveAvatarSessionServiceProtocol
-    private let localVisitAIService: any LocalVisitAIServiceProtocol
-    private let transcriptCaptureService: any TranscriptCaptureServiceProtocol
-    private let startTime = Date()
-    private let timestampFormatter = ISO8601DateFormatter()
-    private var isProcessingAudioChunk = false
 
     init(
-        uid: String,
         patientName: String,
         doctor: DoctorProfile,
-        backendService: any BackendServiceProtocol,
-        liveAvatarService: any LiveAvatarSessionServiceProtocol,
-        localVisitAIService: any LocalVisitAIServiceProtocol = DisabledLocalVisitAIService(),
-        transcriptCaptureService: any TranscriptCaptureServiceProtocol = PlaceholderTranscriptCaptureService()
+        liveAvatarService: any LiveAvatarSessionServiceProtocol
     ) {
-        self.uid = uid
         self.patientName = patientName
         self.doctor = doctor
-        self.backendService = backendService
         self.liveAvatarService = liveAvatarService
-        self.localVisitAIService = localVisitAIService
-        self.transcriptCaptureService = transcriptCaptureService
-        self.timestampFormatter.formatOptions = [.withInternetDateTime]
     }
 
     func startVisit() async {
@@ -64,7 +43,6 @@ final class CheckupViewModel: ObservableObject {
             )
             uiState.session = session
             uiState.statusMessage = "Session ready. Speak to the avatar."
-            appendTranscript(speaker: "Doctor", text: "Hi, \(patientName)!")
         } catch {
             uiState.errorMessage = error.localizedDescription
             uiState.statusMessage = "Unable to connect to doctor"
@@ -73,8 +51,6 @@ final class CheckupViewModel: ObservableObject {
 
     func endVisit() async {
         uiState.errorMessage = nil
-        stopTranscriptCapture()
-        await localVisitAIService.release()
 
         do {
             try await liveAvatarService.stopSession(sessionID: uiState.session?.sessionID)
@@ -87,149 +63,5 @@ final class CheckupViewModel: ObservableObject {
 
     func toggleMute() {
         uiState.isMuted.toggle()
-    }
-
-    func appendTranscript(speaker: String, text: String) {
-        transcript.append(TranscriptEntry(speaker: speaker, text: text))
-    }
-
-    func toggleTranscriptCapture() async {
-        if uiState.isTranscriptionEnabled {
-            stopTranscriptCapture()
-            uiState.statusMessage = "Local STT stopped"
-            return
-        }
-
-        do {
-            try await transcriptCaptureService.requestPermissions()
-            uiState.errorMessage = nil
-            uiState.statusMessage = "Loading local Whisper..."
-            try await localVisitAIService.preloadWhisper { [weak self] progress in
-                Task { @MainActor in
-                    self?.uiState.statusMessage = "Loading local Whisper: \(Int(progress * 100))%"
-                }
-            }
-
-            try await transcriptCaptureService.beginCapture { [weak self] audioSamples in
-                await self?.processAudioChunk(audioSamples)
-            }
-
-            uiState.isTranscriptionEnabled = true
-            uiState.statusMessage = "Local STT listening"
-        } catch {
-            uiState.errorMessage = error.localizedDescription
-            uiState.statusMessage = "Local STT unavailable"
-        }
-    }
-
-    func requestSummary() async {
-        let transcriptText = transcript
-            .map { "\($0.speaker): \($0.text)" }
-            .joined(separator: "\n")
-
-        guard !transcriptText.isEmpty else {
-            uiState.errorMessage = "Transcript is empty. Capture or append transcript data before summarizing."
-            return
-        }
-
-        uiState.errorMessage = nil
-        uiState.statusMessage = "Generating summary..."
-
-        do {
-            let response = try await backendService.summarizeTranscript(
-                request: TranscriptSummaryRequest(
-                    transcript: transcriptText,
-                    startTime: timestampFormatter.string(from: startTime),
-                    currentTime: timestampFormatter.string(from: Date()),
-                    phoneNumber: "",
-                    uid: uid,
-                    doctorName: doctor.agentName,
-                    userName: patientName
-                )
-            )
-
-            uiState.summaryText = response.summary
-            uiState.nextSteps = response.nextSteps
-            uiState.statusMessage = "Summary ready"
-        } catch {
-            uiState.errorMessage = error.localizedDescription
-            uiState.statusMessage = "Summary failed"
-        }
-    }
-
-    private func stopTranscriptCapture() {
-        transcriptCaptureService.stopCapture()
-        uiState.isTranscriptionEnabled = false
-        uiState.isProcessingTranscript = false
-        isProcessingAudioChunk = false
-    }
-
-    private func processAudioChunk(_ audioSamples: [Float]) async {
-        guard !isProcessingAudioChunk, uiState.isTranscriptionEnabled, !uiState.isMuted else {
-            return
-        }
-
-        isProcessingAudioChunk = true
-        uiState.isProcessingTranscript = true
-        uiState.statusMessage = "Transcribing locally..."
-
-        defer {
-            isProcessingAudioChunk = false
-            uiState.isProcessingTranscript = false
-        }
-
-        do {
-            let rawText = try await localVisitAIService.transcribe(audioSamples: audioSamples)
-            let cleanedText = try await localVisitAIService.cleanTranscript(
-                rawText: rawText,
-                patientContext: buildPatientContext()
-            )
-            let patientText = cleanedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? rawText : cleanedText
-
-            guard !patientText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                uiState.statusMessage = "Local STT listening"
-                return
-            }
-
-            appendTranscript(speaker: "Patient", text: patientText)
-            uiState.statusMessage = "Generating local doctor response..."
-
-            guard let session = uiState.session else {
-                uiState.statusMessage = "Transcript updated"
-                return
-            }
-
-            let reply = try await localVisitAIService.generateDoctorReply(
-                transcript: transcriptText(),
-                patientContext: buildPatientContext()
-            )
-
-            guard !reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                uiState.statusMessage = "Local STT listening"
-                return
-            }
-
-            appendTranscript(speaker: "Doctor", text: reply)
-            try await liveAvatarService.speak(text: reply, in: session, taskType: .repeat)
-            uiState.statusMessage = "Avatar speaking local Gemma response"
-        } catch {
-            uiState.errorMessage = error.localizedDescription
-            uiState.statusMessage = "Local model step failed"
-        }
-    }
-
-    private func transcriptText() -> String {
-        transcript
-            .map { "\($0.speaker): \($0.text)" }
-            .joined(separator: "\n")
-    }
-
-    private func buildPatientContext() -> String {
-        """
-        Patient name: \(patientName).
-        Doctor: \(doctor.agentName).
-        Specialty: \(doctor.specialty).
-        Visit context: live virtual checkup.
-        """
     }
 }

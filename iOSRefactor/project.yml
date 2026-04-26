@@ -28,25 +28,12 @@ targets:
     platform: iOS
     sources:
       - path: Sources
-      - path: Resources
     configFiles:
       Debug: Config/Secrets.xcconfig
       Release: Config/Secrets.xcconfig
     dependencies:
       - package: LiveKit
         product: LiveKit
-  AmiyaHealthiOSTests:
-    type: bundle.unit-test
-    platform: iOS
-    sources:
-      - path: Tests
-    dependencies:
-      - target: AmiyaHealthiOS
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.amiya.health.ios.tests
-        GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_MODULE_NAME: AmiyaHealthiOSTests
 
 schemes:
   AmiyaHealthiOS:
@@ -55,9 +42,5 @@ schemes:
         AmiyaHealthiOS: all
     run:
       config: Debug
-    test:
-      config: Debug
-      targets:
-        - name: AmiyaHealthiOSTests
     archive:
       config: Release
