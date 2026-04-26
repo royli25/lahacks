@@ -50,7 +50,7 @@ enum DoctorDirectory {
         switch doctorID {
         case "alpha":
             return LiveAvatarDoctorConfig(
-                avatarID: "fc9c1f9f-bc99-4fd9-a6b2-8b4b5669a046",
+                avatarID: "567e8371-f69f-49ec-9f2d-054083431165",
                 voiceID: "de5574fc-009e-4a01-a881-9919ef8f5a0c"
             )
         case "beta":
