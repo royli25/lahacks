@@ -7,6 +7,7 @@ final class AppEnvironmentTests: XCTestCase {
             "BackendBaseURL": "$(BACKEND_BASE_URL)",
             "LiveAvatarAPIBaseURL": "$(LIVEAVATAR_API_BASE_URL)",
             "LiveAvatarAPIKey": "paste-liveavatar-key-here",
+            "LiveAvatarDefaultContextID": "$(LIVEAVATAR_DEFAULT_CONTEXT_ID)",
             "LiveAvatarAlphaContextID": "$(LIVEAVATAR_ALPHA_CONTEXT_ID)",
             "LiveAvatarBetaContextID": "$(LIVEAVATAR_BETA_CONTEXT_ID)",
             "LiveAvatarGammaContextID": "$(LIVEAVATAR_GAMMA_CONTEXT_ID)",
@@ -17,17 +18,18 @@ final class AppEnvironmentTests: XCTestCase {
         XCTAssertEqual(environment.backendBaseURL.absoluteString, "http://127.0.0.1:8000/")
         XCTAssertEqual(environment.liveAvatarAPIBaseURL.absoluteString, "https://api.liveavatar.com/v1/")
         XCTAssertEqual(environment.liveAvatarAPIKey, "")
-        XCTAssertNil(environment.liveAvatarContextID(for: "alpha"))
+        XCTAssertEqual(environment.liveAvatarContextID(for: "alpha"), "567e8371-f69f-49ec-9f2d-054083431165")
         XCTAssertEqual(environment.avatarSpeechAPIBaseURL.absoluteString, "https://api.heygen.com/v1/")
         XCTAssertEqual(environment.avatarSpeechTaskPath, "streaming.task")
     }
 
     func testResolvesDoctorSpecificLiveAvatarContextID() {
         let environment = AppEnvironment.current(infoDictionary: [
-            "LiveAvatarAlphaContextID": "context-alpha"
+            "LiveAvatarAlphaContextID": "context-alpha",
+            "LiveAvatarDefaultContextID": "context-default"
         ])
 
         XCTAssertEqual(environment.liveAvatarContextID(for: "alpha"), "context-alpha")
-        XCTAssertNil(environment.liveAvatarContextID(for: "beta"))
+        XCTAssertEqual(environment.liveAvatarContextID(for: "beta"), "context-default")
     }
 }

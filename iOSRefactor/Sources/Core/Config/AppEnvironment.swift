@@ -1,5 +1,7 @@
 import Foundation
 
+private let defaultLiveAvatarContextID = "567e8371-f69f-49ec-9f2d-054083431165"
+
 struct AppEnvironment {
     let backendBaseURL: URL
     let liveAvatarAPIBaseURL: URL
@@ -27,7 +29,9 @@ struct AppEnvironment {
         let liveAvatarContextIDs = [
             "alpha": sanitizedConfigurationValue(infoDictionary["LiveAvatarAlphaContextID"] as? String),
             "beta": sanitizedConfigurationValue(infoDictionary["LiveAvatarBetaContextID"] as? String),
-            "gamma": sanitizedConfigurationValue(infoDictionary["LiveAvatarGammaContextID"] as? String)
+            "gamma": sanitizedConfigurationValue(infoDictionary["LiveAvatarGammaContextID"] as? String),
+            "default": sanitizedConfigurationValue(infoDictionary["LiveAvatarDefaultContextID"] as? String)
+                ?? defaultLiveAvatarContextID
         ].compactMapValues { $0 }
         let avatarSpeechAPIBaseURL = URL(
             string: sanitizedConfigurationValue(infoDictionary["AvatarSpeechAPIBaseURL"] as? String)
@@ -60,6 +64,6 @@ struct AppEnvironment {
     }
 
     func liveAvatarContextID(for doctorID: String) -> String? {
-        liveAvatarContextIDs[doctorID]
+        liveAvatarContextIDs[doctorID] ?? liveAvatarContextIDs["default"]
     }
 }
