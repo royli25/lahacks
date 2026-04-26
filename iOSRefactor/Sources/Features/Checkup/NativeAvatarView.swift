@@ -5,6 +5,7 @@ struct NativeAvatarView: View {
     let session: LiveAvatarSessionPayload?
     let statusMessage: String
     let errorMessage: String?
+    let isMuted: Bool
 
     @StateObject private var roomCtx = RoomContext()
 
@@ -23,10 +24,14 @@ struct NativeAvatarView: View {
             if let s = session,
                let url = s.livekitURL,
                let token = s.livekitClientToken {
-                await roomCtx.connect(url: url, token: token)
+                await roomCtx.connect(url: url, token: token, microphoneEnabled: !isMuted)
             } else {
                 await roomCtx.disconnect()
             }
+        }
+        .task(id: isMuted) {
+            guard session != nil else { return }
+            await roomCtx.setMicrophone(enabled: !isMuted)
         }
         .onDisappear {
             Task { await roomCtx.disconnect() }
@@ -97,23 +102,37 @@ private struct LiveKitVideoView: UIViewRepresentable {
 final class RoomContext: NSObject, ObservableObject {
     private let room = Room()
     @Published var firstRemoteVideoTrack: VideoTrack?
+    @Published var isMicrophoneEnabled = false
 
     override init() {
         super.init()
         room.add(delegate: self)
     }
 
-    func connect(url: String, token: String) async {
+    func connect(url: String, token: String, microphoneEnabled: Bool) async {
         do {
             try await room.connect(url: url, token: token)
+            await setMicrophone(enabled: microphoneEnabled)
         } catch {
             print("[LiveKit] connect error: \(error)")
         }
     }
 
+    func setMicrophone(enabled: Bool) async {
+        do {
+            try await room.localParticipant.setMicrophone(enabled: enabled)
+            isMicrophoneEnabled = enabled
+        } catch {
+            isMicrophoneEnabled = false
+            print("[LiveKit] microphone error: \(error)")
+        }
+    }
+
     func disconnect() async {
+        await setMicrophone(enabled: false)
         await room.disconnect()
         firstRemoteVideoTrack = nil
+        isMicrophoneEnabled = false
     }
 }
 

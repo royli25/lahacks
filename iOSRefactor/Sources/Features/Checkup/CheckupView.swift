@@ -14,7 +14,8 @@ struct CheckupView: View {
             NativeAvatarView(
                 session: viewModel.uiState.session,
                 statusMessage: viewModel.uiState.statusMessage,
-                errorMessage: viewModel.uiState.errorMessage
+                errorMessage: viewModel.uiState.errorMessage,
+                isMuted: viewModel.uiState.isMuted
             )
             .frame(height: 320)
             .padding(.horizontal, 20)
